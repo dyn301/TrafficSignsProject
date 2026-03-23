@@ -1,0 +1,12 @@
+torch
+torchvision
+transformers
+faiss-cpu
+fastapi
+uvicorn
+pandas
+scikit-learn
+matplotlib
+seaborn
+Pillow
+tqdm
