@@ -14,12 +14,13 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
+# --- THAY ĐỔI 1: Import từ file vit_embedding.py thay vì clip_embedding ---
 try:
-    from .clip_embedding import load_clip_model, load_image, get_image_embedding
+    from .vit_embedding import load_vision_model, load_image, get_image_embedding
     from .vector_search import load_faiss_index, search_index
     from .dataset import load_metadata
 except ImportError:
-    from clip_embedding import load_clip_model, load_image, get_image_embedding
+    from vit_embedding import load_vision_model, load_image, get_image_embedding
     from vector_search import load_faiss_index, search_index
     from dataset import load_metadata
 
@@ -37,9 +38,7 @@ async def home():
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Vietnam Traffic Sign Retrieval</title>
-    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -57,7 +56,6 @@ async def home():
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen">
 
-    <!-- Header Section -->
     <header class="bg-white border-b sticky top-0 z-50">
         <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
             <div class="flex items-center gap-2">
@@ -71,14 +69,12 @@ async def home():
 
     <main class="max-w-6xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
         
-        <!-- Left Column: Controls & Preview -->
         <div class="lg:col-span-4 space-y-6">
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                 <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
                     <i data-lucide="upload" class="w-5 h-5"></i> Input Image
                 </h2>
                 
-                <!-- Upload Area -->
                 <div id="dropzone" class="relative border-2 border-dashed border-slate-300 rounded-xl p-4 flex flex-col items-center justify-center gap-3 bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer group mb-4">
                     <input type="file" id="file" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer" />
                     <div id="uploadPlaceholder" class="text-center py-4">
@@ -92,7 +88,6 @@ async def home():
                     </button>
                 </div>
 
-                <!-- Parameters -->
                 <div class="space-y-4">
                     <div>
                         <label for="top_k" class="block text-sm font-medium text-slate-700 mb-1">Số kết quả hàng đầu (K)</label>
@@ -113,14 +108,12 @@ async def home():
             <div id="statusMessage" class="hidden p-4 rounded-xl text-sm border"></div>
         </div>
 
-        <!-- Right Column: Results -->
         <div class="lg:col-span-8">
             <div class="flex items-center justify-between mb-6">
                 <h2 class="text-xl font-bold text-slate-800">Kết quả tìm kiếm</h2>
                 <div id="resultStats" class="text-sm text-slate-500"></div>
             </div>
 
-            <!-- Empty State -->
             <div id="emptyState" class="bg-white border-2 border-dashed border-slate-200 rounded-2xl p-12 text-center">
                 <div class="bg-slate-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                     <i data-lucide="scan-search" class="w-8 h-8 text-slate-400"></i>
@@ -129,7 +122,6 @@ async def home():
                 <p class="text-slate-500 text-sm max-w-xs mx-auto">Tải ảnh lên và nhấn nút tìm kiếm để xem các biển báo tương ứng.</p>
             </div>
 
-            <!-- Grid Output -->
             <div id="output" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
         </div>
     </main>
@@ -288,11 +280,13 @@ _index = None
 _metadata = None
 
 
-def init_system(model_name='openai/clip-vit-base-patch32', index_path='data/faiss_index.faiss', metadata_path='data/metadata.csv', use_fast=False):
+# --- THAY ĐỔI 2: Đổi model mặc định sang ViT và dùng hàm load_vision_model ---
+def init_system(model_name='google/vit-base-patch16-224-in21k', index_path='data/faiss_index.faiss', metadata_path='data/metadata.csv'):
     global _model, _processor, _device, _index, _metadata
 
     if _model is None:
-        _model, _processor, _device = load_clip_model(model_name=model_name, use_fast=use_fast)
+        # Load mô hình ViT
+        _model, _processor, _device = load_vision_model(model_name=model_name)
 
     if _index is None:
         if not os.path.exists(index_path):
@@ -336,6 +330,7 @@ async def predict(file: UploadFile = File(...), top_k: int = 5):
     image_data = await file.read()
     image = load_image(BytesIO(image_data)).convert('RGB')
 
+    # Hàm get_image_embedding mới (đã cập nhật) hỗ trợ trực tiếp ViT
     query_embedding = get_image_embedding(image, _processor, _model, device=_device)
 
     distances, indices = search_index(_index, query_embedding, top_k=top_k)
@@ -350,7 +345,6 @@ async def predict(file: UploadFile = File(...), top_k: int = 5):
         if x is None:
             return None
         try:
-            # JSON cannot encode NumPy scalars and can fail on NaN / inf
             return int(x) if isinstance(x, (int,)) else x
         except Exception:
             pass
